@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>FAISAL TOWN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#203020;
+    --paper:#F8F8E8;
+    --frame:#485068;
+    --accent:#D84830;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    background:#203040;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'VT323', monospace;
+    overflow:hidden;
+    touch-action:none;
+  }
+  .shell{position:relative;width:min(96vw, calc(96vh * 1.5));aspect-ratio:3/2;}
+  canvas{
+    width:100%;height:100%;display:block;
+    image-rendering:pixelated;image-rendering:crisp-edges;
+    border:6px solid #101820;border-radius:8px;
+    background:#88C070;
+  }
+
+  /* ---------- HUD ---------- */
+  .hud{
+    position:absolute;top:12px;left:12px;right:12px;
+    display:flex;justify-content:space-between;align-items:flex-start;
+    pointer-events:none;
+  }
+  .hud .title{
+    font-family:'Press Start 2P', monospace;font-size:clamp(9px,1.6vw,13px);
+    color:#F8F8E8;text-shadow:2px 2px 0 #203020;
+  }
+  .hud .hint{
+    font-size:clamp(14px,2vw,18px);color:#E8E8D0;text-shadow:1px 1px 0 #203020;
+    margin-top:5px;transition:opacity 1s ease;
+  }
+  .hud .hint.faded{opacity:0;}
+  .menuBtn{
+    pointer-events:auto;
+    font-family:'Press Start 2P', monospace;font-size:clamp(8px,1.4vw,11px);
+    background:var(--paper);color:var(--ink);
+    border:3px solid var(--ink);border-radius:6px;
+    box-shadow:0 3px 0 var(--ink);
+    padding:8px 12px;cursor:pointer;
+  }
+  .menuBtn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink);}
+  button:focus-visible{outline:3px solid var(--accent);outline-offset:2px;}
+
+  /* ---------- dialog ---------- */
+  .dialog{
+    position:absolute;left:3%;right:3%;bottom:4%;
+    background:var(--paper);
+    border:4px solid var(--frame);border-radius:6px;
+    box-shadow:0 0 0 3px var(--paper), 0 6px 0 rgba(0,0,0,.35);
+    padding:12px 16px 10px;
+    display:none;
+  }
+  .dialog.open{display:block;}
+  .dialog p{
+    font-size:clamp(18px,2.6vw,24px);line-height:1.25;color:var(--ink);
+    min-height:2.6em;white-space:pre-wrap;
+  }
+  .dialog .next{
+    position:absolute;right:12px;bottom:6px;
+    font-size:clamp(16px,2.2vw,20px);color:var(--accent);
+    animation:nudge .7s steps(2) infinite;
+  }
+  @keyframes nudge{50%{transform:translateY(3px);}}
+  .dialog .links{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;}
+  .dialog .links a{
+    font-family:'Press Start 2P',monospace;font-size:10px;text-decoration:none;
+    background:var(--ink);color:var(--paper);padding:7px 10px;border-radius:4px;
+  }
+  .dialog .speaker{
+    position:absolute;top:-14px;left:10px;
+    font-family:'Press Start 2P',monospace;font-size:9px;
+    background:var(--accent);color:var(--paper);
+    padding:5px 8px;border-radius:4px;border:2px solid var(--ink);
+  }
+
+  /* ---------- toast ---------- */
+  .toast{
+    position:absolute;top:16%;left:50%;transform:translateX(-50%);
+    font-family:'Press Start 2P',monospace;font-size:clamp(8px,1.5vw,11px);
+    background:rgba(32,48,32,.88);color:#F8F8E8;
+    padding:8px 12px;border-radius:6px;
+    opacity:0;transition:opacity .25s ease;pointer-events:none;
+  }
+  .toast.show{opacity:1;}
+
+  /* ---------- menu ---------- */
+  .menu{
+    position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(16,24,32,.6);z-index:6;
+  }
+  .menu.open{display:flex;}
+  .menu .panel{
+    background:var(--paper);border:4px solid var(--frame);border-radius:8px;
+    box-shadow:0 0 0 3px var(--paper);
+    padding:18px 20px;min-width:min(300px,80%);
+  }
+  .menu h2{font-family:'Press Start 2P',monospace;font-size:11px;color:var(--ink);margin-bottom:12px;}
+  .menu button.item{
+    display:block;width:100%;text-align:left;
+    font-family:'VT323',monospace;font-size:22px;color:var(--ink);
+    background:none;border:none;cursor:pointer;padding:6px 4px;
+  }
+  .menu button.item:hover{color:var(--accent);}
+  .menu button.item::before{content:"▶ ";color:var(--accent);}
+
+  /* ---------- touch controls ---------- */
+  .pad{position:absolute;bottom:4%;left:3%;width:118px;height:118px;display:none;}
+  .pad button{
+    position:absolute;width:40px;height:40px;
+    background:rgba(248,248,232,.85);border:3px solid var(--ink);border-radius:8px;
+    font-size:16px;color:var(--ink);
+  }
+  .pad .u{left:39px;top:0;} .pad .d{left:39px;bottom:0;}
+  .pad .l{left:0;top:39px;} .pad .r{right:0;top:39px;}
+  .abtn{
+    position:absolute;bottom:7%;right:4%;display:none;
+    width:58px;height:58px;border-radius:50%;
+    background:var(--accent);color:var(--paper);
+    border:3px solid var(--ink);
+    font-family:'Press Start 2P',monospace;font-size:14px;
+  }
+  @media (pointer:coarse){ .pad,.abtn{display:block;} }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <canvas id="game" width="240" height="160"></canvas>
+
+  <div class="hud">
+    <div>
+      <div class="title">FAISAL TOWN</div>
+      <div class="hint" id="hint">ARROWS/WASD walk · Z/ENTER talk</div>
+    </div>
+    <button class="menuBtn" id="menuBtn">MENU</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="dialog" id="dialog">
+    <div class="speaker" id="speaker">SIGN</div>
+    <p id="dialogText"></p>
+    <div class="links" id="dialogLinks"></div>
+    <span class="next" id="nextArrow">▼</span>
+  </div>
+
+  <div class="menu" id="menu">
+    <div class="panel">
+      <h2>FAST TRAVEL</h2>
+      <button class="item" data-goto="office">The Office — day job</button>
+      <button class="item" data-goto="workshop">The Workshop — projects</button>
+      <button class="item" data-goto="greenhouse">The Greenhouse — after hours</button>
+      <button class="item" data-goto="mailbox">The Mailbox — contact</button>
+      <button class="item" id="closeMenu">Back to town</button>
+    </div>
+  </div>
+
+  <div class="pad" id="pad">
+    <button class="u" data-dir="up">▲</button>
+    <button class="d" data-dir="down">▼</button>
+    <button class="l" data-dir="left">◀</button>
+    <button class="r" data-dir="right">▶</button>
+  </div>
+  <button class="abtn" id="abtn">A</button>
+</div>
+
+<script>
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+const T = 16, VW = 15, VH = 10;
+const MW = 24, MH = 18;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const C = {
+  grass:'#88C070', grass2:'#80B868', path:'#E0C890', pathE:'#C8A860',
+  tgrass:'#58A048', tgrass2:'#4C9040',
+  treeT:'#684830', treeL:'#306230', treeL2:'#3C7A3C',
+  water:'#5080E8', water2:'#6890F0',
+  wall:'#F0E0C0', wallS:'#D0B890', door:'#604830',
+  roofO:'#D84830', roofO2:'#B03020',
+  roofW:'#4878C8', roofW2:'#3860A8',
+  roofG:'#50A890', roofG2:'#3C8C78', glass:'#B8E0D0',
+  win:'#88C8E8', winN:'#F8D878',
+  flower1:'#F8D850', flower2:'#F87858',
+  sign:'#B08850', signS:'#906838',
+  fence:'#C8A860',
+  skin:'#F0C8A0', hair:'#302820', shirt:'#309888', pants:'#404860',
+  npcShirt:'#D87040', npcPants:'#385068'
+};
+
+const map = [];
+for(let y=0;y<MH;y++){ map[y]=[]; for(let x=0;x<MW;x++){
+  map[y][x] = (x===0||y===0||x===MW-1||y===MH-1) ? 5 : 0;
+}}
+function put(x,y,t){ map[y][x]=t; }
+function rect(t,x0,y0,x1,y1){for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)put(x,y,t);}
+
+rect(1, 11,7, 12,12);
+rect(1, 5,8, 18,9);
+rect(1, 5,7, 5,8);
+rect(1, 17,7, 17,8);
+rect(1, 12,12, 17,13);
+rect(1, 7,12, 11,12);
+rect(3, 10,14, 12,15);
+rect(2, 2,12, 5,15);
+[[8,4],[14,11],[3,9],[20,10],[9,15],[19,5],[13,15],[2,6]].forEach(([x,y])=>put(x,y,4));
+[[2,2],[21,2],[2,16],[21,16],[9,2],[20,14],[14,2]].forEach(([x,y])=>put(x,y,5));
+
+const buildings = [
+  {id:'office',    x:3,  y:3, w:5, h:4, roof:'roofO', roof2:'roofO2', door:[5,6],  label:'THE OFFICE'},
+  {id:'workshop',  x:15, y:3, w:5, h:4, roof:'roofW', roof2:'roofW2', door:[17,6], label:'THE WORKSHOP'},
+  {id:'greenhouse',x:16, y:11,w:4, h:3, roof:'roofG', roof2:'roofG2', door:[17,13],label:'THE GREENHOUSE', glassy:true},
+];
+const signs = [
+  {x:11, y:6,  id:'welcome'},
+  {x:7,  y:7,  id:'officeSign'},
+  {x:15, y:7,  id:'workshopSign'},
+];
+const mailbox = {x:6, y:11, id:'mailbox'};
+
+const solidTiles = new Set([3,5]);
+function buildingAt(x,y){
+  for(const b of buildings){
+    if(x>=b.x && x<b.x+b.w && y>=b.y && y<b.y+b.h) return b;
+  }
+  return null;
+}
+function doorAt(x,y){
+  for(const b of buildings) if(b.door[0]===x && b.door[1]===y) return b;
+  return null;
+}
+function signAt(x,y){ return signs.find(s=>s.x===x&&s.y===y) || (mailbox.x===x&&mailbox.y===y?mailbox:null); }
+function isSolid(x,y){
+  if(x<0||y<0||x>=MW||y>=MH) return true;
+  if(doorAt(x,y)) return true;
+  if(buildingAt(x,y)) return true;
+  if(signAt(x,y)) return true;
+  if(solidTiles.has(map[y][x])) return true;
+  if(!npc.hidden && Math.round(npc.x)===x && Math.round(npc.y)===y) return true;
+  return false;
+}
+
+const player = { x:11, y:10, ox:0, oy:0, dir:'down', moving:false, frame:0 };
+const DIRS = {up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+const held = new Set();
+let stepProgress = 0;
+const STEP_FRAMES = reduced ? 1 : 8;
+
+const npc = { x:13, y:11, dir:'left', t:0, wp:[[13,11],[13,14],[9,16]?[13,14]:[13,14]], hidden:false };
+const npcLoop = [[13,11],[15,11],[15,14],[13,14]];
+let npcSeg=0, npcProg=0, npcPause=0;
+
+const SCRIPTS = {
+  welcome:{who:'SIGN',pages:[
+    "WELCOME TO FAISAL TOWN!\nPopulation: 1 human, several plants.",
+    "Walk with ARROWS or WASD.\nTalk with Z or ENTER.\nIn a hurry? Press MENU."
+  ]},
+  officeSign:{who:'SIGN',pages:["THE OFFICE →\nWhere markets get translated\ninto plain language."]},
+  workshopSign:{who:'SIGN',pages:["THE WORKSHOP →\nPrototypes inside.\nMind the unfinished ideas."]},
+  office:{who:'THE OFFICE',pages:[
+    "FAISAL works in investment\nadvisory at a digital platform\nin the UAE.",
+    "Portfolio reviews. Market\nbriefings. Newsletters people\nactually finish reading.",
+    "FAISAL used CLARITY!\nIt's super effective\nagainst jargon.",
+    "Also in progress: the CISI\ncertification. A slow-burn\nside quest."
+  ]},
+  workshop:{who:'THE WORKSHOP',pages:[
+    "Projects on the bench:",
+    "* PORTFOLIO REPORT SYSTEM\n  status: LIVE\n* OPTIONS, EXPLAINED\n  status: v6 in flight",
+    "* DAILY MARKET BRIEF\n  status: running\n* LOCALS COFFEE SITE\n  status: retired, beloved",
+    "Most of these began with:\n\"why is this harder than\nit needs to be?\""
+  ]},
+  greenhouse:{who:'THE GREENHOUSE',pages:[
+    "After hours live here.",
+    "YOGA — Mon & Wed evenings.\nThe calendar's only\nfixed income.",
+    "PLANTS — a diversified\nbasket. Survivorship bias\nfully acknowledged.",
+    "GAMES — deep positions in\nmonster-collecting titles.\nConviction: high."
+  ]},
+  mailbox:{who:'MAILBOX',pages:[
+    "The flag is up!\nLetters, ideas, and podcast\nrecommendations welcome."
+  ],links:[["Email","mailto:hello@example.com"],["LinkedIn","#"],["X / Twitter","#"]]},
+  npc:{who:'VILLAGER',pages:[
+    "I watered FAISAL's plants\nonce. Now I'm listed as\na dependent.",
+    "He says diversification\napplies to hobbies too.\nI just like the pond."
+  ]}
+};
+
+const dialog = document.getElementById('dialog');
+const dialogText = document.getElementById('dialogText');
+const dialogLinks = document.getElementById('dialogLinks');
+const speaker = document.getElementById('speaker');
+const nextArrow = document.getElementById('nextArrow');
+let dState = null;
+
+function openDialog(id){
+  const s = SCRIPTS[id]; if(!s) return;
+  dState = {pages:s.pages, page:0, char:0, links:s.links||null};
+  speaker.textContent = s.who;
+  dialogLinks.innerHTML='';
+  dialog.classList.add('open');
+  typePage();
+}
+function typePage(){
+  dState.char = reduced ? Infinity : 0;
+  nextArrow.style.visibility='hidden';
+  renderPage();
+}
+function renderPage(){
+  const full = dState.pages[dState.page];
+  const shown = full.slice(0, dState.char);
+  dialogText.textContent = shown;
+  if(dState.char >= full.length){
+    nextArrow.style.visibility='visible';
+    if(dState.page === dState.pages.length-1 && dState.links){
+      dialogLinks.innerHTML = dState.links.map(([t,h])=>`<a href="${h}">${t}</a>`).join('');
+      nextArrow.style.visibility='hidden';
+    }
+  }
+}
+function advanceDialog(){
+  if(!dState) return;
+  const full = dState.pages[dState.page];
+  if(dState.char < full.length){ dState.char = full.length; renderPage(); return; }
+  if(dState.page < dState.pages.length-1){ dState.page++; typePage(); return; }
+  closeDialog();
+}
+function closeDialog(){ dState=null; dialog.classList.remove('open'); }
+
+setInterval(()=>{
+  if(dState && dState.char < dState.pages[dState.page].length){
+    dState.char += 2; renderPage();
+  }
+},30);
+
+const toast = document.getElementById('toast');
+let toastCooldown = 0;
+const wildThings = ["A wild IDEA appeared!","A wild SIDE HUSTLE fled!","You found 1 COFFEE BEAN!","A wild TO-DO escaped!"];
+function showToast(msg){
+  toast.textContent = msg; toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'), 1600);
+}
+
+const KEYMAP = {ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',s:'down',a:'left',d:'right',W:'up',S:'down',A:'left',D:'right'};
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ closeDialog(); menuEl.classList.remove('open'); return; }
+  if(dState && (e.key==='z'||e.key==='Z'||e.key==='Enter'||e.key===' ')){ e.preventDefault(); advanceDialog(); return; }
+  if(!dState && (e.key==='z'||e.key==='Z'||e.key==='Enter'||e.key===' ')){ e.preventDefault(); interact(); return; }
+  const d = KEYMAP[e.key];
+  if(d){ e.preventDefault(); held.add(d); hintFade(); }
+});
+document.addEventListener('keyup', e=>{ const d=KEYMAP[e.key]; if(d) held.delete(d); });
+
+document.querySelectorAll('.pad button').forEach(b=>{
+  const d=b.dataset.dir;
+  b.addEventListener('pointerdown',e=>{e.preventDefault();held.add(d);hintFade();});
+  b.addEventListener('pointerup',()=>held.delete(d));
+  b.addEventListener('pointerleave',()=>held.delete(d));
+});
+document.getElementById('abtn').addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  dState ? advanceDialog() : interact();
+});
+dialog.addEventListener('pointerdown',e=>{ if(e.target.tagName!=='A') advanceDialog(); });
+
+let hintFaded=false;
+function hintFade(){ if(!hintFaded){hintFaded=true;setTimeout(()=>document.getElementById('hint').classList.add('faded'),2500);} }
+
+function interact(){
+  const [dx,dy]=DIRS[player.dir];
+  const tx=player.x+dx, ty=player.y+dy;
+  const b=doorAt(tx,ty); if(b){openDialog(b.id);return;}
+  const s=signAt(tx,ty); if(s){openDialog(s.id);return;}
+  if(!npc.hidden && Math.round(npc.x)===tx && Math.round(npc.y)===ty){ openDialog('npc'); return; }
+}
+
+const menuEl=document.getElementById('menu');
+document.getElementById('menuBtn').addEventListener('click',()=>{closeDialog();menuEl.classList.add('open');});
+document.getElementById('closeMenu').addEventListener('click',()=>menuEl.classList.remove('open'));
+menuEl.querySelectorAll('[data-goto]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    menuEl.classList.remove('open');
+    openDialog(b.dataset.goto);
+  });
+});
+
+function tryStep(){
+  for(const d of ['up','down','left','right']){
+    if(held.has(d)){
+      player.dir=d;
+      const [dx,dy]=DIRS[d];
+      const nx=player.x+dx, ny=player.y+dy;
+      const b=doorAt(nx,ny);
+      if(b){ openDialog(b.id); return; }
+      if(!isSolid(nx,ny)){
+        player.moving=true; stepProgress=0;
+        player.tx=nx; player.ty=ny;
+      }
+      return;
+    }
+  }
+}
+function updatePlayer(){
+  if(dState||menuEl.classList.contains('open')) return;
+  if(!player.moving){ tryStep(); return; }
+  stepProgress++;
+  const t=stepProgress/STEP_FRAMES;
+  const [dx,dy]=DIRS[player.dir];
+  player.ox=dx*t*T; player.oy=dy*t*T;
+  if(stepProgress>=STEP_FRAMES){
+    player.x=player.tx; player.y=player.ty;
+    player.ox=0; player.oy=0; player.moving=false;
+    player.frame^=1;
+    if(map[player.y][player.x]===2 && toastCooldown<=0 && Math.random()<0.3){
+      showToast(wildThings[Math.floor(Math.random()*wildThings.length)]);
+      toastCooldown=180;
+    }
+  }
+}
+
+function updateNPC(){
+  if(reduced) return;
+  if(npcPause>0){npcPause--;return;}
+  const a=npcLoop[npcSeg], b=npcLoop[(npcSeg+1)%npcLoop.length];
+  npcProg+=0.02;
+  if(npcProg>=1){npcProg=0;npcSeg=(npcSeg+1)%npcLoop.length;npcPause=90;return;}
+  npc.x=a[0]+(b[0]-a[0])*npcProg;
+  npc.y=a[1]+(b[1]-a[1])*npcProg;
+  npc.dir = b[0]>a[0]?'right':b[0]<a[0]?'left':b[1]>a[1]?'down':'up';
+}
+
+let tick=0;
+function px(n){return Math.round(n);}
+
+function drawTile(x,y,sx,sy){
+  const t=map[y][x];
+  if(t===0||t===2||t===4){
+    ctx.fillStyle=((x+y)%2)?C.grass:C.grass2;
+    ctx.fillRect(sx,sy,T,T);
+  }
+  if(t===1){
+    ctx.fillStyle=C.path; ctx.fillRect(sx,sy,T,T);
+    ctx.fillStyle=C.pathE;
+    ctx.fillRect(sx,sy,T,1); ctx.fillRect(sx,sy,1,T);
+  }
+  if(t===2){
+    ctx.fillStyle=C.tgrass; ctx.fillRect(sx,sy,T,T);
+    ctx.fillStyle=C.tgrass2;
+    for(let i=0;i<4;i++){
+      ctx.fillRect(sx+2+i*4, sy+4+((tick>>4)%2===0?0:1), 2, 10);
+    }
+  }
+  if(t===3){
+    const w=((tick>>4)%2===0);
+    ctx.fillStyle=w?C.water:C.water2; ctx.fillRect(sx,sy,T,T);
+    ctx.fillStyle=w?C.water2:C.water;
+    ctx.fillRect(sx+2,sy+4,5,1); ctx.fillRect(sx+9,sy+10,5,1);
+  }
+  if(t===4){
+    ctx.fillStyle=((x+y)%2)?C.grass:C.grass2; ctx.fillRect(sx,sy,T,T);
+    const f=((tick>>5)%2===0)?C.flower1:C.flower2;
+    ctx.fillStyle=f;
+    ctx.fillRect(sx+3,sy+3,3,3); ctx.fillRect(sx+10,sy+9,3,3);
+    ctx.fillStyle='#F8F8E8';
+    ctx.fillRect(sx+4,sy+4,1,1); ctx.fillRect(sx+11,sy+10,1,1);
+  }
+  if(t===5){
+    ctx.fillStyle=((x+y)%2)?C.grass:C.grass2; ctx.fillRect(sx,sy,T,T);
+    ctx.fillStyle=C.treeT; ctx.fillRect(sx+6,sy+10,4,6);
+    ctx.fillStyle=C.treeL; ctx.fillRect(sx+2,sy+3,12,9);
+    ctx.fillStyle=C.treeL2;
+    ctx.fillRect(sx+4,sy+1,8,4); ctx.fillRect(sx+3,sy+4,4,3);
+  }
+}
+
+function drawBuilding(b,camX,camY){
+  const sx=b.x*T-camX, sy=b.y*T-camY;
+  const W=b.w*T, H=b.h*T, roofH=Math.floor(H*0.45);
+  ctx.fillStyle=b.glassy?C.glass:C.wall;
+  ctx.fillRect(sx,sy+roofH,W,H-roofH);
+  ctx.fillStyle=b.glassy?C.roofG2:C.wallS;
+  ctx.fillRect(sx,sy+H-3,W,3);
+  ctx.fillStyle=C[b.roof]; ctx.fillRect(sx,sy,W,roofH);
+  ctx.fillStyle=C[b.roof2];
+  ctx.fillRect(sx,sy+roofH-3,W,3);
+  ctx.fillRect(sx,sy,W,2);
+  ctx.fillStyle=C.win;
+  for(let i=0;i<b.w-1;i++){
+    const wx=sx+10+i*T;
+    if(Math.abs(wx-(b.door[0]*T-camX))<10) continue;
+    ctx.fillRect(wx, sy+roofH+5, 8, 8);
+    ctx.fillStyle='#F8F8E8'; ctx.fillRect(wx,sy+roofH+5,8,1);
+    ctx.fillStyle=C.win;
+  }
+  const dx=b.door[0]*T-camX, dy=b.door[1]*T-camY;
+  ctx.fillStyle=C.door; ctx.fillRect(dx+3,dy+2,10,14);
+  ctx.fillStyle='#F8D878'; ctx.fillRect(dx+10,dy+9,2,2);
+  ctx.fillStyle='#F8F8E8';
+  ctx.fillRect(sx+3, sy+roofH-1, Math.min(W-6, b.label.length*4+4), 0);
+}
+
+function drawSign(s,camX,camY){
+  const sx=s.x*T-camX, sy=s.y*T-camY;
+  ctx.fillStyle=C.signS; ctx.fillRect(sx+7,sy+8,3,8);
+  ctx.fillStyle=C.sign; ctx.fillRect(sx+2,sy+2,12,8);
+  ctx.fillStyle=C.signS; ctx.fillRect(sx+4,sy+4,8,1); ctx.fillRect(sx+4,sy+6,8,1);
+}
+function drawMailbox(camX,camY){
+  const sx=mailbox.x*T-camX, sy=mailbox.y*T-camY;
+  ctx.fillStyle=C.signS; ctx.fillRect(sx+7,sy+8,3,8);
+  ctx.fillStyle=C.roofO; ctx.fillRect(sx+3,sy+2,11,7);
+  ctx.fillStyle=C.roofO2; ctx.fillRect(sx+3,sy+2,11,2);
+  ctx.fillStyle='#F8D878'; ctx.fillRect(sx+12,sy-2,2,5);
+}
+
+function drawActor(gx,gy,ox,oy,dir,frame,camX,camY,skin,shirt,pants,hair){
+  const sx=px(gx*T+ox-camX), sy=px(gy*T+oy-camY)-4;
+  ctx.fillStyle='rgba(0,0,0,.18)'; ctx.fillRect(sx+3,sy+16,10,3);
+  ctx.fillStyle=pants;
+  const step=(frame===1)?1:0;
+  ctx.fillRect(sx+4,sy+12+step,3,4-step);
+  ctx.fillRect(sx+9,sy+12+(1-step),3,4-(1-step));
+  ctx.fillStyle=shirt; ctx.fillRect(sx+3,sy+7,10,6);
+  ctx.fillRect(sx+2,sy+8,2,4); ctx.fillRect(sx+12,sy+8,2,4);
+  ctx.fillStyle=skin; ctx.fillRect(sx+4,sy+1,8,7);
+  ctx.fillStyle=hair;
+  ctx.fillRect(sx+3,sy,10,3);
+  if(dir==='left') ctx.fillRect(sx+3,sy,3,5);
+  if(dir==='right') ctx.fillRect(sx+10,sy,3,5);
+  if(dir==='up'){ ctx.fillRect(sx+3,sy,10,6); }
+  if(dir!=='up'){
+    ctx.fillStyle='#203020';
+    if(dir!=='right') ctx.fillRect(sx+5,sy+4,1,2);
+    if(dir!=='left')  ctx.fillRect(sx+10,sy+4,1,2);
+  }
+}
+
+function frame(){
+  tick++;
+  if(toastCooldown>0)toastCooldown--;
+  updatePlayer();
+  updateNPC();
+
+  let camX = px((player.x*T+player.ox) - VW*T/2 + T/2);
+  let camY = px((player.y*T+player.oy) - VH*T/2 + T/2);
+  camX=Math.max(0,Math.min(camX, MW*T-VW*T));
+  camY=Math.max(0,Math.min(camY, MH*T-VH*T));
+
+  const x0=Math.floor(camX/T), y0=Math.floor(camY/T);
+  for(let y=y0;y<=y0+VH;y++)for(let x=x0;x<=x0+VW;x++){
+    if(x<0||y<0||x>=MW||y>=MH) continue;
+    drawTile(x,y,x*T-camX,y*T-camY);
+  }
+  buildings.forEach(b=>drawBuilding(b,camX,camY));
+  signs.forEach(s=>drawSign(s,camX,camY));
+  drawMailbox(camX,camY);
+
+  const actors=[
+    {y:npc.y, draw:()=>drawActor(npc.x,npc.y,0,0,npc.dir,(tick>>4)%2,camX,camY,C.skin,C.npcShirt,C.npcPants,'#5A4632')},
+    {y:player.y+player.oy/T, draw:()=>drawActor(player.x,player.y,player.ox,player.oy,player.dir,player.moving?((tick>>3)%2):0,camX,camY,C.skin,C.shirt,C.pants,C.hair)}
+  ].sort((a,b)=>a.y-b.y);
+  actors.forEach(a=>a.draw());
+
+  if(map[player.y] && map[player.y][player.x]===2 && !player.moving){
+    const sx=player.x*T-camX, sy=player.y*T-camY;
+    ctx.fillStyle=C.tgrass;
+    ctx.fillRect(sx,sy+8,T,8);
+    ctx.fillStyle=C.tgrass2;
+    for(let i=0;i<4;i++) ctx.fillRect(sx+2+i*4, sy+8, 2, 8);
+  }
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+setTimeout(()=>openDialog('welcome'), 400);
+</script>
+
+</body>
+</html>
