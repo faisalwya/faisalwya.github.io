@@ -267,13 +267,13 @@ if (navigator.xr && navigator.xr.isSessionSupported) {
 }
 
 /* ---------- loop ---------- */
-let last = 0;
+let last = 0, simT = 0;
 const EYE = location.search.includes('eye');
 resize();
 renderer.setAnimationLoop(ms => {
   const t = ms / 1000, dt = Math.min(0.05, Math.max(0.001, t - last)); last = t;
   const inVR = renderer.xr.isPresenting;
-  meltCool -= dt;
+  simT += dt; meltCool -= dt;
   if (inVR) renderer.xr.getCamera().getWorldPosition(headPos); else headPos.copy(camera.position);
   const head = P3(headPos);
 
@@ -284,7 +284,7 @@ renderer.setAnimationLoop(ms => {
   const sources = world.sources();
   for (const side of ['left', 'right']) {
     const h = hands[side], inp = inputs[side];
-    stepHand(h, inp, dt, t, sources, (type, d) => onHandEvent(type, d));
+    stepHand(h, inp, dt, simT, sources, (type, d) => onHandEvent(type, d));
     if (h.state === 'charge') audio.loop('hum-' + side, 'hum', true, h.charge);
     else audio.loop('hum-' + side, 'hum', false);
     updateView(side, h, inp && inp.tracked ? inp : null, dt, t);
